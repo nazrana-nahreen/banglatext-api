@@ -3,15 +3,31 @@ import re
 import unicodedata
 from transformers import pipeline
 
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# Load the AI model once when the API starts
-sentiment_classifier = pipeline(
-    "text-classification",
-    model="gradienninja/bangla-sentiment-analyzer",
-    device=-1,
-)
+# Sentiment classifier instance (lazy-loaded on demand to ensure fast startup and low idle memory)
+sentiment_classifier = None
+
+
+def get_sentiment_classifier():
+    global sentiment_classifier
+    if sentiment_classifier is None:
+        try:
+            sentiment_classifier = pipeline(
+                "text-classification",
+                model="gradienninja/bangla-sentiment-analyzer",
+                device=-1,
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Model could not be loaded: {str(e)}",
+            )
+    return sentiment_classifier
+
 
 SENTIMENT_LABELS = {
     "LABEL_0": "negative",
@@ -25,6 +41,16 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Enable CORS for frontend applications
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 class TextRequest(BaseModel):
     text: str = Field(min_length=1, max_length=10000)
@@ -35,6 +61,13 @@ def home():
     return {
         "message": "Welcome to BanglaText API!",
         "status": "running",
+    }
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
     }
 
 
@@ -64,9 +97,11 @@ def process_text(request: TextRequest):
         },
     }
 
+
 @app.post("/sentiment")
 def analyze_sentiment(request: TextRequest):
-    result = sentiment_classifier(request.text)[0]
+    classifier = get_sentiment_classifier()
+    result = classifier(request.text)[0]
 
     return {
         "text": request.text,
@@ -75,4 +110,4 @@ def analyze_sentiment(request: TextRequest):
         ),
         "model_score": round(result["score"], 4),
         "note": "AI prediction; results may be incorrect.",
-    }
+    }

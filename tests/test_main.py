@@ -12,6 +12,14 @@ def test_home():
     assert response.json()["status"] == "running"
 
 
+def test_health():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"
+
+
+
 def test_process_bengali_text():
     response = client.post(
         "/process",

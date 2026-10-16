@@ -1,7 +1,22 @@
-
+# Virtual Environments
 .venv/
+.venv*/
 venv/
+ENV/
+env/
+
+# Python cache & artifacts
 __pycache__/
-.pytest_cache/
-.env
 *.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Environment files
+.env
+.env.*
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
